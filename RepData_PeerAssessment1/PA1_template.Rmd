@@ -1,0 +1,139 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+output: 
+  html_document:
+    keep_md: true
+---
+
+
+## Loading and preprocessing the data
+
+```{r loading_data, echo=TRUE}
+        data <- read.csv("activity.csv")
+        head(data)
+```
+
+
+## What is mean total number of steps taken per day?
+
+```{r mean_steps, echo=TRUE, warning=FALSE, message=FALSE}
+        library(dplyr)
+        mean_steps <- data %>% group_by(date) %>% 
+                summarise(sum = sum(steps, na.rm= TRUE), mean = mean(steps, na.rm= TRUE))
+        print(mean_steps, n = 62)
+        hist(mean_steps$sum, col = 'red', xlab = 'Total Number of Steps', 
+             main = 'Histogram of Total Number of Steps per Day' )
+```
+
+## What is the average daily activity pattern?
+
+```{r, avg_daily_activity, echo = TRUE, warning = FALSE}
+        daily_pattern <- data %>% group_by(interval) %>%
+        summarise(mean = mean(steps, na.rm = TRUE))
+
+        library(ggplot2)
+        daily_pattern %>% ggplot(aes(interval, mean))+
+                geom_line()+
+                geom_segment(aes(x = daily_pattern$interval[which.max(daily_pattern$mean)], 
+                                 xend = daily_pattern$interval[which.max(daily_pattern$mean)], 
+                                 y=0, 
+                                 yend=max(daily_pattern$mean)), 
+                             col = 'red')
+```
+
+## Imputing missing values
+
+``` {r, imputing, echo = TRUE, warning = FALSE, message = FALSE}
+sum(is.na(data))
+
+print(data %>% group_by(date) %>% summarise(sum = sum(is.na(steps))), n=62)
+```
+
+
+To impute these NA values we'll be use mean values of 5min intervals
+
+
+``` {r, imputing_step2, echo = TRUE, message = FALSE, warning = FALSE}
+
+        tidy <- data
+        tidy <- left_join(tidy, daily_pattern, by = 'interval') %>%
+        mutate(steps = ifelse(is.na(steps), mean, steps)) %>% 
+                select(steps, date, interval)
+
+```
+
+```{r, total_num, echo = TRUE, message = FALSE, warning = FALSE}
+
+        tidy_sum <- tidy %>% group_by(date) %>% summarise(sum = sum(steps))
+        hist(tidy_sum$sum, col = 'red', xlab = 'Total Number of Steps', 
+             main = 'Histogram of Total Number of Steps per Day')
+
+```
+
+Summary of Total Number of Steps per Day with without imputation;
+
+``` {r, without, echo = TRUE, warning = FALSE, message = FALSE}
+
+        data %>% group_by(date) %>% mutate(sum = sum(steps)) %>% 
+        select(sum) %>% summary()
+
+```
+Summary of Total Number of Steps per Day with imputation;
+
+``` {r, with, echo = TRUE, warning = FALSE, message = FALSE}
+
+        tidy_sum %>% summary()
+
+```
+
+As seen in summaries there are no impact of imputation on the data. But getting rid of NA's is healthy way of running analyses.
+
+## Are there differences in activity patterns between weekdays and weekends?
+
+First of all date column must be converted date format to character format;
+
+```{r, date, echo=TRUE, warning=FALSE, message=FALSE}
+
+        tidy$date <- as.Date(tidy$date, "%Y-%m-%d")
+```
+
+Then add days column to data set;
+
+```{r, days, echo=TRUE, warning=FALSE, message=FALSE}
+
+        tidy <- tidy %>% mutate (days = weekdays(date))
+```
+
+Turn days column to factor column with respect to weekdays or weekends;
+
+```{r, weekend, echo=TRUE, warning=FALSE, message=FALSE}
+
+        tidy$days <- factor(tidy$days, levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"), labels = c("Weekday", "Weekday", "Weekday", "Weekday", "Weekday", "Weekend", "Weekend"))
+
+```
+
+```{r, timeplot_weekdays, echo=TRUE, warning=FALSE, message=FALSE}
+
+        library(gridExtra)
+
+
+        graph_1 <- tidy %>% filter(days == "Weekday") %>% group_by(interval) %>% 
+                summarise(mean = mean(steps)) %>% 
+                ggplot(aes(interval, mean))+
+                geom_line()+
+                ggtitle("Weekdays")
+                
+
+
+        graph_2 <- tidy %>% filter(days == "Weekend") %>% group_by(interval) %>% 
+                summarise(mean = mean(steps)) %>%
+                ggplot(aes(interval, mean))+
+                geom_line()+
+                ggtitle("Weekends")
+        
+        grid.arrange(graph_1, graph_2, nrow = 2)
+
+```
+
+
+
